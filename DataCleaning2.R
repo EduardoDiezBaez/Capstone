@@ -32,8 +32,34 @@ preproc <- corpus.sample
 
 # 4.1. Abbreviations removing
 
-new.abbr <- data.frame(abv = c("Mr.", "Mrs.", "Ms.", "i.e.", "A.D.", "B.C.", "A.M.", "P.M.", "et al.", "Jr.", "Dr.", "Sr.", "Sen.", "U.S.", "U.S.A.", "p.s.", "w/", "&", "$"), rep = c("Mr", "Mrs", "Ms", "ie", "AD", "BC", "AM", "PM", "et al", "Jr", "Dr", "Sr", "Sen", "USA", "USA", "ps", "with", "and", "dollar "))
-preproc <- tm_map(preproc, content_transformer(replace_abbreviation), abbreviation = new.abbr)
+replaceAbbr <- function(x) {
+    x <- gsub("Mr\\.", "Mr", x)
+    x <- gsub("Ms\\.", "Ms", x)
+    x <- gsub("Mrs\\.", "Mrs", x)
+    x <- gsub("i\\.e\\.", "ie", x)
+    x <- gsub("A\\.D\\.", "AD", x)
+    x <- gsub("B\\.C\\.", "BC", x)
+    x <- gsub("A\\.M\\.", "AM", x)
+    x <- gsub("P\\.M\\.", "PM", x)
+    x <- gsub("et al\\.", "et al", x)
+    x <- gsub("Jr\\.", "Jr", x)
+    x <- gsub("Sr\\.", "Sr", x)
+    x <- gsub("Dr\\.", "Dr", x)
+    x <- gsub("Sen\\.", "Sen", x)
+    x <- gsub("PhD\\.", "PhD", x)
+    x <- gsub("U\\.S\\.", "US", x)
+    x <- gsub("U\\.S\\.A\\.", "USA", x)
+    x <- gsub("p\\.s\\.", "ps", x)
+    x <- gsub("w\\/", "with", x)
+    x <- gsub("\\&", "and", x)
+    x <- gsub("\\$", " dollar ", x)
+    return(x)
+}
+preproc <- tm_map(preproc, content_transformer(replaceAbbr))
+#new.abbr <- data.frame(abv = c("Mr.", "Mrs.", "Ms.", "i.e.", "A.D.", "B.C.", "A.M.", "P.M.", "et al.", "Jr.", "Dr.", "Sr.", "Sen.", "U.S.", "U.S.A.", "p.s."), rep = c("Mr", "Mrs", "Ms", "ie", "AD", "BC", "AM", "PM", "et al", "Jr", "Dr", "Sr", "Sen", "USA", "USA", "ps"))
+#abv = c("Mr.", "Mrs.", "Ms.", "i.e.", "A.D.", "B.C.", "A.M.", "P.M.", "et al.", "Jr.", "Dr.", "Sr.", "Sen.", "U.S.", "U.S.A.", "p.s.", "w/", "&", "$")
+#rep = c("Mr", "Mrs", "Ms", "ie", "AD", "BC", "AM", "PM", "et al", "Jr", "Dr", "Sr", "Sen", "USA", "USA", "ps", "with", "and", "dollar ")
+#preproc <- tm_map(preproc, content_transformer(replace_abbreviation), abbreviation = new.abbr)
 
 # 4.2. Ordinals and numbers removing
 
@@ -48,6 +74,13 @@ removeURL2 <- function(x) gsub("www.[A-z0-9]+.[a-z]{2,}", "", x)
 preproc <- tm_map(preproc, content_transformer(removeURL2))
 
 # 4.4. Remove brackets
+
+# First : just remove quotes with one or two words in between (not a sentence)
+
+removeQuotations <- function(x) gsub("\"([A-z0-9]*\\s*[A-z0-9]*\\.*)\"", "\\1", x)
+preproc <- tm_map(preproc, content_transformer(removeQuotations))
+
+# Second : remove brackets and quotes with more than two words (a sentence)
 
 removeBrackets <- function(x) {
     bra <- genXtract(x, left = c("(", "\"", "\u201c", "[", "{"), right = c(")", "\"", "\u201d", "]", "}"))
