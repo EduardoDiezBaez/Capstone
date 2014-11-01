@@ -117,7 +117,7 @@ preproc <- tm_map(preproc, content_transformer(iconv), from = "latin1", to = "AS
 
 # 4.10. Punctuation removing
 
-removePunc <- function(x) gsub("\\.|:|!|\\?|\\||_|(|)|,|;|=|\\*", "", x)
+removePunc <- function(x) gsub("\\.|:|!|\\?|\\||_|\\(|\\)|,|;|=|\\*|>|<", "", x)
 preproc <- tm_map(preproc, content_transformer(removePunc))
 
 # 4.11. Trailing spaces removing
