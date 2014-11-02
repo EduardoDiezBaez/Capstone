@@ -12,13 +12,13 @@ corpus <- Corpus(dir, readerControl = list(reader = readPlain))
 # 3. Random sampling corpus
 
 set.seed(1537)
-sample1 <- sample(1:length(corpus[[1]]$content), length(corpus[[1]]$content) / 100)
+sample1 <- sample(1:length(corpus[[1]]$content), length(corpus[[1]]$content) / 10000)
 blogs <- corpus[[1]]$content[sample1]
 write(blogs, file = "final/en_US/sample/en_US.blogs.sample.txt")
-sample2 <- sample(1:length(corpus[[2]]$content), length(corpus[[2]]$content) / 100)
+sample2 <- sample(1:length(corpus[[2]]$content), length(corpus[[2]]$content) / 10000)
 news <- corpus[[2]]$content[sample2]
 write(news, file = "final/en_US/sample/en_US.news.sample.txt")
-sample3 <- sample(1:length(corpus[[3]]$content), length(corpus[[3]]$content) / 100)
+sample3 <- sample(1:length(corpus[[3]]$content), length(corpus[[3]]$content) / 10000)
 twitter <- corpus[[3]]$content[sample3]
 write(twitter, file = "final/en_US/sample/en_US.twitter.sample.txt")
 dir.source <- DirSource("final/en_US/sample/", encoding = "UTF-8")
@@ -39,8 +39,10 @@ replaceAbbr <- function(x) {
     x <- gsub("i\\.e\\.", "ie", x)
     x <- gsub("A\\.D\\.", "AD", x)
     x <- gsub("B\\.C\\.", "BC", x)
-    x <- gsub("A\\.M\\.", "AM", x)
-    x <- gsub("P\\.M\\.", "PM", x)
+    x <- gsub("A\\.M\\.", "am", x)
+    x <- gsub("P\\.M\\.", "pm", x)
+    x <- gsub("a\\.m\\.", "am", x)
+    x <- gsub("p\\.m\\.", "pm", x)
     x <- gsub("et al\\.", "et al", x)
     x <- gsub("Jr\\.", "Jr", x)
     x <- gsub("Sr\\.", "Sr", x)
@@ -50,9 +52,12 @@ replaceAbbr <- function(x) {
     x <- gsub("U\\.S\\.", "US", x)
     x <- gsub("U\\.S\\.A\\.", "USA", x)
     x <- gsub("p\\.s\\.", "ps", x)
+    x <- gsub("o\\.k\\.", "ok", x)
     x <- gsub("w\\/", "with", x)
     x <- gsub("\\&", "and", x)
     x <- gsub("\\$", " dollar ", x)
+    x <- gsub("m\\.r\\.i\\.", "mri", x)
+    x <- gsub("\\/", " ", x)
     return(x)
 }
 preproc <- tm_map(preproc, content_transformer(replaceAbbr))
@@ -61,55 +66,72 @@ preproc <- tm_map(preproc, content_transformer(replaceAbbr))
 #rep = c("Mr", "Mrs", "Ms", "ie", "AD", "BC", "AM", "PM", "et al", "Jr", "Dr", "Sr", "Sen", "USA", "USA", "ps", "with", "and", "dollar ")
 #preproc <- tm_map(preproc, content_transformer(replace_abbreviation), abbreviation = new.abbr)
 
-# 4.2. Ordinals and numbers removing
+# 4.2. Numbers removing (with the case of decimals)
 
-preproc <- tm_map(preproc, content_transformer(replace_ordinal), num.paste = FALSE)
+removeDecimals <- function(x) gsub("([0-9]*)\\.([0-9]+)", "\\1 \\2", x)
+preproc <- tm_map(preproc, content_transformer(removeDecimals))
+#preproc <- tm_map(preproc, content_transformer(replace_ordinal), num.paste = FALSE)
 preproc <- tm_map(preproc, content_transformer(removeNumbers))
 
-# 4.3. Remove URLs
+# 4.3. Remove URLs and email addresses
 
-removeURL1 <- function(x) gsub("http://", "", x)
-preproc <- tm_map(preproc, content_transformer(removeURL1))
-removeURL2 <- function(x) gsub("www.[A-z0-9]+.[a-z]{2,}", "", x)
-preproc <- tm_map(preproc, content_transformer(removeURL2))
+removeEmail <- function(x) gsub("[A-z0-9._%+-]+@[A-z0-9.-]+\\.(?:[A-z]{2}|com|org|net|edu|gov|mil|biz|info|mobi|name|aero|asia|jobs|museum)", "", x)
+preproc <- tm_map(preproc, content_transformer(removeEmail))
+removeURL <- function(x) sub("((https?|ftp)://)?www\\.[A-z0-9]+\\.[A-z0.9]{2,}", "", x)
+preproc <- tm_map(preproc, content_transformer(removeURL))
+#removeURL2 <- function(x) gsub("www.[A-z0-9]+.[a-z]{2,}", "", x)
+#preproc <- tm_map(preproc, content_transformer(removeURL2))
 
-# 4.4. Remove brackets
+# 4.4. Transform (single) left and right quotation marks
+
+removeLRSQuotation <- function(x) gsub("\u2018|\u2019", "\'", x)
+removeLRDQuotation <- function(x) gsub("\u201c|\u201d", "\"", x)
+preproc <- tm_map(preproc, content_transformer(removeLRSQuotation))
+preproc <- tm_map(preproc, content_transformer(removeLRDQuotation))
+
+# 4.4. Remove brackets (?!!!)
 
 # First : just remove quotes with one or two words in between (not a sentence)
 
-removeQuotations <- function(x) gsub("\"([A-z0-9]*\\s*[A-z0-9]*\\.*)\"", "\\1", x)
-preproc <- tm_map(preproc, content_transformer(removeQuotations))
+#removeQuotations <- function(x) gsub("[\"|\u2018|\u201c|\']([A-z0-9]*\\s*[A-z0-9]*\\.*)[\"|\u2019|\u201d|\']", "\\1", x)
+#preproc <- tm_map(preproc, content_transformer(removeQuotations))
 
 # Second : remove brackets and quotes with more than two words (a sentence)
 
-removeBrackets <- function(x) {
-    bra <- genXtract(x, left = c("(", "\"", "\u201c", "[", "{"), right = c(")", "\"", "\u201d", "]", "}"))
-    bra <- unlist(bra)
-    text <- genX(x, left = c("(", "\"", "\u201c", "[", "{"), right = c(")", "\"", "\u201d", "]", "}"), scrub = FALSE)
-    text <- unlist(text)
-    return(c(text, bra))
-}
-preproc <- tm_map(preproc, content_transformer(removeBrackets))
+#removeBrackets <- function(x) {
+#    bra <- genXtract(x, left = c("\'", "(", "\"", "\u201c", "\u2018", "[", "{"), right = c("\'", ")", "\"", "\u201d", "\u2019", "]", "}"))
+#    bra <- unlist(bra)
+#    text <- genX(x, left = c("\'", "(", "\"", "\u201c", "\u2018", "[", "{"), right = c("\'", ")", "\"", "\u201d", "\u2019", "]", "}"), scrub = FALSE)
+#    text <- unlist(text)
+#    return(c(text, bra))
+#}
+#preproc <- tm_map(preproc, content_transformer(removeBrackets))
 
 # 4.5. Remove hashtags
 
-removeHashtags <- function(x) gsub("#\\w+", "", x)
+removeHashtags <- function(x) gsub("#[A-z0-9]+", "", x)
 preproc <- tm_map(preproc, content_transformer(removeHashtags))
 
 # 4.6. Remove intra word dashes
 
-removeDashes <- function(x) gsub("-+|/", " ", x)
+removeDashes <- function(x) gsub("-+|—", " ", x)
 preproc <- tm_map(preproc, content_transformer(removeDashes))
 #removeDollar <- function(x) gsub("\\$", "", x)
 #preproc <- tm_map(preproc, content_transformer(removeDollar))
 
-# 4.7. Sentence splitting
+# 4.8. Lower casing (and taking care of "I's")
 
-preproc <- tm_map(preproc, content_transformer(sent_detect), endmarks = c("?", ".", "!", "|", "…", ":", "\n","\r\n"), language = "en")
-
-# 4.8. Lower casing
-
+transformIs <- function(x) {
+    x <- gsub("^i ", "I ", x)
+    x <- gsub("^i'", "I'", x)
+    x <- gsub(" i ", " I ", x)
+    x <- gsub(" i'", " I'", x)
+    x <- gsub(".i ", ". I ", x)
+    x <- gsub(".i'", ". I'", x)
+    return(x)
+}
 preproc <- tm_map(preproc, content_transformer(tolower))
+preproc <- tm_map(preproc, content_transformer(transformIs))
 
 # 4.9. Non ASCII characters removing
 
@@ -117,24 +139,37 @@ preproc <- tm_map(preproc, content_transformer(iconv), from = "latin1", to = "AS
 
 # 4.10. Punctuation removing
 
-removePunc <- function(x) gsub("\\.|:|!|\\?|\\||_|\\(|\\)|,|;|=|\\*|>|<", "", x)
+transformDots <- function(x) gsub("[:?!|…]+", ".", x)
+removePunc <- function(x) gsub('[])(,;#%$^*\\~{}[&+=@/"`|<>_]+', "", x)
+#removePunc <- function(x) gsub("\\.|:|!|\\?|\\||_|\\(|\\)|,|;|=|\\*|>|<|\\[|\\]|#|^|$|\\~|@", "", x)
+preproc <- tm_map(preproc, content_transformer(transformDots))
 preproc <- tm_map(preproc, content_transformer(removePunc))
+
+# 4.12. White space removing
+
+preproc <- tm_map(preproc, stripWhitespace)
+
+# 4.7. Sentence splitting
+
+#preproc1 <- tm_map(preproc, content_transformer(sent_detect), endmarks = c("?", ".", "!", "|", "…", ":", "\n","\r\n"), language = "en")
+SentenceTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1, delimiters = "\\r\\n\\t.:?!|…"))
+preproc <- tm_map(preproc, content_transformer(SentenceTokenizer))
 
 # 4.11. Trailing spaces removing
 
 removeTrailingSpaces <- function(x) gsub("^\\s|\\s$", "", x)
 preproc <- tm_map(preproc, content_transformer(removeTrailingSpaces))
 
-# 4.12. White space removing
-
-preproc <- tm_map(preproc, stripWhitespace)
-
-# 4.13 Empty strings removing
+# 4.13. Empty strings removing
 
 removeEmptyStrings <- function(x) {
     return(x[x != ""])
 }
 preproc <- tm_map(preproc, content_transformer(removeEmptyStrings))
+
+# 4.14. Remove double entries
+
+preproc <- tm_map(preproc, content_transformer(unique))
 
 # 5. Profanity filtering
 
